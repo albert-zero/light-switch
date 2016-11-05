@@ -1,4 +1,3 @@
-
 /* -----------------------------------------------------------------
  *  Author: Albert Zedlitz
  *  
@@ -80,15 +79,25 @@ void loop() {
   int    xValue = 0;
   
   StaticJsonBuffer<200> xJsonBuffer;
-  JsonObject& xReturn   = xJsonBuffer.createObject();
+  JsonObject& xReturn = xJsonBuffer.createObject();
 
   xReturn["code"]  = 200;
   xReturn["value"] = "OK";
     
   xHeader = xClient.readStringUntil('\n');
 
+  // Check if the right method is called
+  if (xHeader.indexOf("/gpio") == -1) {
+    Serial.println(xHeader);
+    xReturn["code"]  = 500;
+    xReturn["value"] = "invalid request";
+
+    writeResponse(xClient, xReturn);
+    return;
+  }
+
   if (xHeader.indexOf("POST") != -1) {
-    /* Handle POST request */
+    // Handle POST request
     while (xHeader.length() > 2) {
       Serial.println(xHeader);
       xHeader = xClient.readStringUntil('\n');
@@ -96,22 +105,20 @@ void loop() {
     xBody = xClient.readStringUntil('\n');
     Serial.println(xBody);
 
-    if (!parseUserData(xResponse, xBody)) {
+    if (!parseUserData(xBody)) {
       xReturn["code"]  = 500;
       xReturn["value"] = "Invalid input";      
     }
   }
   else if (xHeader.indexOf("GET") != -1) {
-    /* Handle GET request */
+    // Handle GET request
     Serial.println(xHeader);
     
     if (xHeader.indexOf("/gpio/0") != -1) {
       digitalWrite(2, 0);
-      xUpdate["value"] = 0;
     }
     else if (xHeader.indexOf("/gpio/1") != -1) {
       digitalWrite(2, 1);
-      xUpdate["value"] = 1;
     }
     else {
       xReturn["code"]  = 500;      
@@ -121,11 +128,9 @@ void loop() {
   else {
     xReturn["code"]  = 500;      
     xReturn["value"] = "Unknown method";      
-    return;      
   }
-  xClient.flush();
+
   writeResponse(xClient, xReturn);
-  delay(1);
   Serial.println("Client disonnected");
 }
 
@@ -167,5 +172,7 @@ void writeResponse(WiFiClient& xClient, JsonObject& xJson) {
   xClient.println();
 
   xJson.printTo(xClient);
+  xClient.flush();
+  delay(1);
 }
 
