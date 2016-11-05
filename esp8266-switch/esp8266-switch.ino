@@ -81,21 +81,14 @@ void loop() {
   
   StaticJsonBuffer<200> xJsonBuffer;
   JsonObject& xReturn   = xJsonBuffer.createObject();
-  JsonObject& xUpdate   = xJsonBuffer.createObject();
-  JsonObject& xResponse = xJsonBuffer.createObject();
 
   xReturn["code"]  = 200;
   xReturn["value"] = "OK";
-  
-  xUpdate["pin"]   = 2;
-  xUpdate["value"] = 0;
-
-  xResponse["return"] = xReturn;
-  xResponse["update"] = xUpdate;
-  
+    
   xHeader = xClient.readStringUntil('\n');
 
-  if (xHeader.indexOf("POST") >= 0) {
+  if (xHeader.indexOf("POST") != -1) {
+    /* Handle POST request */
     while (xHeader.length() > 2) {
       Serial.println(xHeader);
       xHeader = xClient.readStringUntil('\n');
@@ -103,16 +96,13 @@ void loop() {
     xBody = xClient.readStringUntil('\n');
     Serial.println(xBody);
 
-    if (parseUserData(xResponse, xBody)) {
-      pinMode(xUpdate["pin"], OUTPUT);
-      analogWrite(xUpdate["pin"], xUpdate["value"]);
-    }
-    else {
+    if (!parseUserData(xResponse, xBody)) {
       xReturn["code"]  = 500;
       xReturn["value"] = "Invalid input";      
     }
   }
-  else if (xHeader.indexOf("GET") >= 0) {
+  else if (xHeader.indexOf("GET") != -1) {
+    /* Handle GET request */
     Serial.println(xHeader);
     
     if (xHeader.indexOf("/gpio/0") != -1) {
@@ -134,14 +124,14 @@ void loop() {
     return;      
   }
   xClient.flush();
-  writeResponse(xClient, xResponse);
+  writeResponse(xClient, xReturn);
   delay(1);
   Serial.println("Client disonnected");
 }
 
 /* ----------------------------------------------------------------- */
 /* ----------------------------------------------------------------- */
-bool parseUserData(JsonObject& xResponse, String& xContent) {
+bool parseUserData(String& xContent) {
   long xPinNr = 2;
   long xValue = 0;
   char xCharBuf[128];
@@ -161,8 +151,8 @@ bool parseUserData(JsonObject& xResponse, String& xContent) {
   if (xRoot.containsKey("value")) {
     xValue = xRoot["value"].as<long>();
   }
-  xResponse["pin"]   = xPinNr;
-  xResponse["value"] = xValue;
+  pinMode(xPinNr, OUTPUT);
+  analogWrite(xPinNr, xValue);
 
   return true;
 }
