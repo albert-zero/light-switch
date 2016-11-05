@@ -173,7 +173,7 @@ void writeResponse(WiFiClient& xClient, JsonObject& xJson) {
   xClient.println("HTTP/1.1 200 OK");
   xClient.println("Content-Type: application/json");
   xClient.println("Connection: close");
-  xClient.println("nAccess-Control-Allow-Origin:*");
+  xClient.println("Access-Control-Allow-Origin:*");
   xClient.println();
 
   xJson.printTo(xClient);
