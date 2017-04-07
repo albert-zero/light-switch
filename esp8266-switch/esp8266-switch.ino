@@ -16,8 +16,8 @@
 #include <ArduinoJson.h>
 #include <math.h>
 
-const char* ssid     = "TheNetwork";
-const char* password = "ThePassword";
+const char* ssid     = "UntereMuehle";
+const char* password = "74285140323410393146";
 
 // Create an instance of the server
 // specify the port to listen on as an argument
@@ -52,7 +52,12 @@ void setup() {
   // Print the IP address
   Serial.println(WiFi.localIP());
 
+  pinMode(1, OUTPUT);
   pinMode(2, OUTPUT);
+  pinMode(3, OUTPUT);
+  pinMode(4, OUTPUT);
+  pinMode(5, OUTPUT);
+  pinMode(16, OUTPUT);
 }
 
 /* ----------------------------------------------------------------- */
@@ -85,16 +90,6 @@ void loop() {
   xReturn["value"] = "OK";
     
   xHeader = xClient.readStringUntil('\n');
-
-  // Check if the right method is called
-  if (xHeader.indexOf("/gpio") == -1) {
-    Serial.println(xHeader);
-    xReturn["code"]  = 500;
-    xReturn["value"] = "invalid request";
-
-    writeResponse(xClient, xReturn);
-    return;
-  }
 
   if (xHeader.indexOf("POST") != -1) {
     // Handle POST request
@@ -140,8 +135,11 @@ bool parseUserData(String& xContent) {
   long xPinNr = 2;
   long xValue = 0;
   char xCharBuf[128];
+
+  Serial.println("parse data 1");
   StaticJsonBuffer<200> xJsonBuffer;
   
+  Serial.println("parse data 2");
   xContent.toCharArray(xCharBuf, 128);
   JsonObject& xRoot = xJsonBuffer.parseObject(xCharBuf);
 
@@ -150,13 +148,13 @@ bool parseUserData(String& xContent) {
     return false;
   }
 
+  Serial.println("parse data 3");
   if (xRoot.containsKey("pin")) {
     xPinNr = xRoot["pin"].as<long>();
   }
   if (xRoot.containsKey("value")) {
     xValue = xRoot["value"].as<long>();
   }
-  pinMode(xPinNr, OUTPUT);
   analogWrite(xPinNr, xValue);
 
   return true;

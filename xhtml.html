@@ -9,7 +9,7 @@
 			var xResponse;
 			var xhttp = new XMLHttpRequest();
 			
-			console.log("doSwitch " + aPin + " " + aValue);
+			console.log("doSwitch " + aPin + " " + aValue );
 			
 			xhttp.onreadystatechange = function() {
 				if (this.readyState == 4 && this.status == 200) {
@@ -21,14 +21,16 @@
 			};
 			
 			var aJsonObj = {"pin": aPin, "value": aValue};
-			xhttp.open("POST", "http://192.168.178.88/gpio/", true);
-			xhttp.send(JSON.stringify(aJsonObj));
+			xhttp.open("POST", "http://192.168.178.88/gpio/0", true);
+			xhttp.send(JSON.stringify(aJsonObj) + "\n");
 		}
     </script>
 </head>
 <body>
 	<p name="output"/>
 	
-	<input name="aBlue" type="range" min="0" max="255" value="0" step="5" onchange="doSwitch(5, this.value)"/>
+	<input name="aBlue" type="range" min="0" max="1024" value="0" step="8" onchange="doSwitch(16, this.value)"/>
+	<input name="aRed"  type="range" min="0" max="1024" value="0" step="8" onchange="doSwitch(5, this.value)"/>
+	<input name="aYell" type="range" min="0" max="1024" value="0" step="8" onchange="doSwitch(4, this.value)"/>
 </body>
 </html>
