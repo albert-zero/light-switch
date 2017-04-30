@@ -24,153 +24,171 @@ const char* password = "74285140323410393146";
 WiFiServer server(80);
 IPAddress  aIp (192, 168, 178, 88); 
 IPAddress  aMs (255, 255, 255, 0);
+WiFiClient xClient;
+
+StaticJsonBuffer<200> xJsonBuffer;
+JsonObject           *xReturn;
 
 /* ----------------------------------------------------------------- */
 /* ----------------------------------------------------------------- */
 void setup() {
-  Serial.begin(115200);
+    Serial.begin(115200);
   
-  // Connect to WiFi network
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
+    // Connect to WiFi network
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
 
-  //WiFi.softAPConfig(ip, ip, ip);
-  WiFi.config(aIp, aIp, aMs);
-  WiFi.begin(ssid, password);
+    //WiFi.softAPConfig(ip, ip, ip);
+    WiFi.config(aIp, aIp, aMs);
+    WiFi.begin(ssid, password);
   
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.println("WiFi connected");
+    while (WiFi.status() != WL_CONNECTED) {
+       delay(100);
+       Serial.print(".");
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
   
-  // Start the server
-  server.begin();
-  Serial.println("Server started");
+    // Start the server
+    server.begin();
+    Serial.println("Server started");
 
-  // Print the IP address
-  Serial.println(WiFi.localIP());
+    // Print the IP address
+    Serial.println(WiFi.localIP());
 
-  pinMode(1, OUTPUT);
-  pinMode(2, OUTPUT);
-  pinMode(3, OUTPUT);
-  pinMode(4, OUTPUT);
-  pinMode(5, OUTPUT);
-  pinMode(16, OUTPUT);
+    pinMode( 2, OUTPUT);
+    pinMode( 4, OUTPUT);
+    pinMode( 5, OUTPUT);
+    pinMode(16, OUTPUT);
+
+    xReturn = &xJsonBuffer.createObject();
 }
 
 /* ----------------------------------------------------------------- */
 /* ----------------------------------------------------------------- */
 void loop() {
-  // Check if a client has connected
-  WiFiClient xClient = server.available();
-  if (!xClient) {
-    return;
-  }
-  
-  // Wait until the client sends some data
-  Serial.println("new client request");
-  while(!xClient.available()){
-    delay(1);
-  }
-  
-  // Read the request, which is either GET or POST:
-  // GET : Read one line 
-  // POST: Read all lines until empty line \r\n 
-  String xHeader;
-  String xBody;
-  int    xPinNr = 2;
-  int    xValue = 0;
-  
-  StaticJsonBuffer<200> xJsonBuffer;
-  JsonObject& xReturn = xJsonBuffer.createObject();
+    // Check if a client has connected
+    int    xLoopCnt   = 0;
 
-  xReturn["code"]  = 200;
-  xReturn["value"] = "OK";
+    // Wait until the client sends some data
+    Serial.println("new client request");
+    while(!xClient.available()){
+        xClient = server.available();
+        delay(5);        
+    }
+    Serial.println("start request loop");
+    // Read the request, which is either GET or POST:
+    // GET : Read one line 
+    // POST: Read all lines until empty line \r\n 
+    String xHeader;
+    String xBody;
+    int    xPinNr     = 2;
+    int    xValue     = 0;
+    int    xAvailable = 0;
+    char   xBuffer[1024];
+
+    xLoopCnt   = 0;
     
-  xHeader = xClient.readStringUntil('\n');
+    (*xReturn)["code"]   = 200;
+    (*xReturn)["value"]  = "OK";
 
-  if (xHeader.indexOf("POST") != -1) {
-    // Handle POST request
-    while (xHeader.length() > 2) {
-      Serial.println(xHeader);
-      xHeader = xClient.readStringUntil('\n');
+    xClient.setTimeout(100); 
+    if (!xClient.connected()) {
+        Serial.println();
+        Serial.println("disconnecting from server.");
+        xClient.stop();
     }
-    xBody = xClient.readStringUntil('\n');
-    Serial.println(xBody);
-
-    if (!parseUserData(xBody)) {
-      xReturn["code"]  = 500;
-      xReturn["value"] = "Invalid input";      
-    }
-  }
-  else if (xHeader.indexOf("GET") != -1) {
-    // Handle GET request
-    Serial.println(xHeader);
     
-    if (xHeader.indexOf("/gpio/0") != -1) {
-      digitalWrite(2, 0);
-    }
-    else if (xHeader.indexOf("/gpio/1") != -1) {
-      digitalWrite(2, 1);
-    }
-    else {
-      xReturn["code"]  = 500;      
-      xReturn["value"] = "Unknown request";      
-    }
-  }  
-  else {
-    xReturn["code"]  = 500;      
-    xReturn["value"] = "Unknown method";      
-  }
+    // Read first line
+    xHeader = xClient.readStringUntil('\r');
 
-  writeResponse(xClient, xReturn);
-  Serial.println("Client disonnected");
+    // Read the HTTP header for POST requests
+    if (xHeader.indexOf("POST") != -1) {
+        xBody = xClient.readStringUntil('\n');
+        while (xLoopCnt == 0 || (xBody.length() > 4 && xLoopCnt < 20)) {
+            xLoopCnt++;
+            xBody = xClient.readStringUntil('\n');
+            Serial.print(xBody.length() );
+            Serial.println(":header:" + xBody);
+        }
+        xBody = xClient.readString();
+        Serial.println("body:" + xBody);
+
+        if (xBody.length() == 0 || !parseUserData(xBody)) {
+            (*xReturn)["code"]  = 500;
+            (*xReturn)["value"] = "Invalid input";      
+        }
+    }
+    Serial.println("process body ....");
+    
+    // Read the HTTP header for GET requests
+    // And switch the LED on board. This is for connection tests
+    if (xHeader.indexOf("GET") != -1) {
+        if (xHeader.indexOf("/gpio/0") != -1) {
+            digitalWrite(2, 0);
+        }
+        else if (xHeader.indexOf("/gpio/1") != -1) {
+            digitalWrite(2, 1);
+        }
+        else {
+            (*xReturn)["code"]  = 404;      
+            (*xReturn)["value"] = "Unknown request";      
+        }
+    }
+    
+    //writeResponse(xClient, xReturn);
+    //xClient.flush();
+    //delay(1);
+    //xClient.stop();
+    Serial.println("send response ....");
 }
 
 /* ----------------------------------------------------------------- */
 /* ----------------------------------------------------------------- */
 bool parseUserData(String& xContent) {
-  long xPinNr = 2;
-  long xValue = 0;
-  char xCharBuf[128];
+    long xPinNr = 2;
+    long xValue = 0;
+    char xCharBuf[128];
 
-  Serial.println("parse data 1");
-  StaticJsonBuffer<200> xJsonBuffer;
+    StaticJsonBuffer<200> xJsonBuffer;
   
-  Serial.println("parse data 2");
-  xContent.toCharArray(xCharBuf, 128);
-  JsonObject& xRoot = xJsonBuffer.parseObject(xCharBuf);
+    xContent.toCharArray(xCharBuf, 128);
+    JsonObject& xRoot = xJsonBuffer.parseObject(xCharBuf);
 
-  if (!xRoot.success()) {
-    Serial.println("JSON parsing failed!");
-    return false;
-  }
+    if (!xRoot.success()) {
+        Serial.println("JSON parsing failed! ");
+        Serial.println("chars:" + xContent);
+        return false;
+    }
 
-  Serial.println("parse data 3");
-  if (xRoot.containsKey("pin")) {
-    xPinNr = xRoot["pin"].as<long>();
-  }
-  if (xRoot.containsKey("value")) {
-    xValue = xRoot["value"].as<long>();
-  }
-  analogWrite(xPinNr, xValue);
-
-  return true;
+    if (xRoot.containsKey("pin")) {
+        xPinNr = xRoot["pin"].as<long>();
+    }
+    
+    if (xRoot.containsKey("value")) {
+        xValue = xRoot["value"].as<long>();
+    }
+    analogWrite(xPinNr, xValue);
+    return true;
 }
 
 /* ----------------------------------------------------------------- */
 /* ----------------------------------------------------------------- */
-void writeResponse(WiFiClient& xClient, JsonObject& xJson) {
-  xClient.println("HTTP/1.1 200 OK");
-  xClient.println("Content-Type: application/json");
-  xClient.println("Connection: close");
-  xClient.println("Access-Control-Allow-Origin:*");
-  xClient.println();
+void writeResponse(WiFiClient& xClient, JsonObject *xJson) {
+    String xResponse;
+    xResponse = "{\"code\":\"200\", \"value\":\"switch propagated\"}";
+        
+    xClient.flush();
+    xClient.println("HTTP/1.1 200 OK");
+    xClient.println("Content-Type: application/json");
+    xClient.println("Connection: keep-alive");
+    xClient.println("Access-Control-Allow-Origin:*");
+    xClient.print  ("Content-Length:"); xClient.println(xResponse.length());
+    xClient.println();
 
-  xJson.printTo(xClient);
-  xClient.flush();
-  delay(1);
+    //xJson.printTo(xClient);
+    xClient.println(xResponse);
+    xClient.flush();
+    delay(4);
 }
 
